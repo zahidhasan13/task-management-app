@@ -1,12 +1,10 @@
 // src/navigation/BottomTabNavigator.js
-import React from "react";
-import { StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { StyleSheet, View } from "react-native";
+import CreateTeamScreen from "../screens/CreateTeam/CreateTeamScreen";
 import HomeScreen from "../screens/Home/HomeScreen";
 import ProfileScreen from "../screens/Profile/ProfileScreen";
-import CreateTeamScreen from "../screens/CreateTeam/CreateTeamScreen";
-import TaskListScreen from "../screens/Tasks/TaskListScreen";
 
 const Tab = createBottomTabNavigator();
 
@@ -34,7 +32,7 @@ export default function TabNavigator() {
 
       <Tab.Screen
         name="CreateTeam"
-        component={TaskListScreen}
+        component={CreateTeamScreen}
         options={{
           tabBarLabel: "",
           tabBarIcon: () => (
