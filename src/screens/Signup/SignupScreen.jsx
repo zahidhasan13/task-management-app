@@ -1,18 +1,18 @@
-import React, { useState } from "react";
 import { API_URL } from "@env";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Button from "../../components/Button";
+import { useState } from "react";
+import {
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
 import { useDispatch } from "react-redux";
+import Button from "../../components/Button";
 import { setCredentials } from "../../redux/features/authSlice";
 
 export default function SignupScreen({ navigation }) {
@@ -45,7 +45,7 @@ export default function SignupScreen({ navigation }) {
 
       dispatch(setCredentials({ user: data.user, token: data.token }));
       Alert.alert("Success", "Account Created ✅");
-      navigation.navigate("Home");
+    //   navigation.navigate("Home");
     } catch (err) {
       console.log(err);
       Alert.alert("Error", "Something went wrong");
