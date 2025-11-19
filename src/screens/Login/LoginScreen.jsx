@@ -1,23 +1,53 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons"; // Icons for email/password
+import { API_URL } from "@env";
+import { Ionicons } from "@expo/vector-icons";
+import { useState } from "react";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { useDispatch } from "react-redux";
 import Button from "../../components/Button";
+import { setCredentials } from "../../redux/features/authSlice";
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    console.log("Login Pressed", { email, password });
+  const dispatch = useDispatch();
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      return Alert.alert("Error", "Please enter email and password");
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+      console.log("API Response:", data);
+
+      if (!res.ok) {
+        Alert.alert("Login Failed", data.message || "Invalid credentials");
+        setLoading(false);
+        return;
+      }
+
+      // Save user + token to Redux
+      dispatch(setCredentials({ user: data.user, token: data.token }));
+
+      Alert.alert("Success", "Logged in successfully");
+      // ✅ No navigation needed; MainNavigator auto-switches to Tabs
+    } catch (error) {
+      console.log(error);
+      Alert.alert("Error", "Something went wrong. Try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -72,7 +102,7 @@ export default function LoginScreen({ navigation }) {
 
         {/* Login Button */}
         <Button
-          title="Login"
+          title={loading ? <ActivityIndicator color="#fff" /> : "Login"}
           onPress={handleLogin}
           backgroundColor="#6C63FF"
           style={{ marginTop: 20 }}

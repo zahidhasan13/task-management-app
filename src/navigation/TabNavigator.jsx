@@ -2,6 +2,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StyleSheet, View } from "react-native";
+import { useSelector } from "react-redux";
 import CreateTeamScreen from "../screens/CreateTeam/CreateTeamScreen";
 import HomeScreen from "../screens/Home/HomeScreen";
 import ProfileScreen from "../screens/Profile/ProfileScreen";
@@ -9,6 +10,9 @@ import ProfileScreen from "../screens/Profile/ProfileScreen";
 const Tab = createBottomTabNavigator();
 
 export default function TabNavigator() {
+  
+    
+  
   return (
     <Tab.Navigator
       screenOptions={{

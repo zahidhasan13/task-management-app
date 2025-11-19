@@ -2,14 +2,14 @@ import { API_URL } from "@env";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useDispatch } from "react-redux";
 import Button from "../../components/Button";
@@ -36,6 +36,7 @@ export default function SignupScreen({ navigation }) {
       });
 
       const data = await res.json();
+      console.log(data,"data")
 
       if (!res.ok) {
         Alert.alert("Error", data.message || "Signup failed");
@@ -45,7 +46,7 @@ export default function SignupScreen({ navigation }) {
 
       dispatch(setCredentials({ user: data.user, token: data.token }));
       Alert.alert("Success", "Account Created ✅");
-    //   navigation.navigate("Home");
+      navigation.navigate("Tabs", { screen: "Home" });
     } catch (err) {
       console.log(err);
       Alert.alert("Error", "Something went wrong");
@@ -65,7 +66,12 @@ export default function SignupScreen({ navigation }) {
 
         {/* Name Input */}
         <View style={styles.inputContainer}>
-          <Ionicons name="person-outline" size={20} color="#666" style={styles.icon} />
+          <Ionicons
+            name="person-outline"
+            size={20}
+            color="#666"
+            style={styles.icon}
+          />
           <TextInput
             style={styles.input}
             placeholder="Enter your name"
@@ -77,7 +83,12 @@ export default function SignupScreen({ navigation }) {
 
         {/* Email Input */}
         <View style={styles.inputContainer}>
-          <Ionicons name="mail-outline" size={20} color="#666" style={styles.icon} />
+          <Ionicons
+            name="mail-outline"
+            size={20}
+            color="#666"
+            style={styles.icon}
+          />
           <TextInput
             style={styles.input}
             placeholder="Enter your email"
@@ -90,7 +101,12 @@ export default function SignupScreen({ navigation }) {
 
         {/* Password Input */}
         <View style={styles.inputContainer}>
-          <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.icon} />
+          <Ionicons
+            name="lock-closed-outline"
+            size={20}
+            color="#666"
+            style={styles.icon}
+          />
           <TextInput
             style={styles.input}
             placeholder="Enter your password"
@@ -150,7 +166,11 @@ const styles = StyleSheet.create({
   icon: { marginRight: 10 },
   eyeIcon: { position: "absolute", right: 15, padding: 5 },
   input: { flex: 1, paddingVertical: 12, fontSize: 16, color: "#333" },
-  loginContainer: { flexDirection: "row", justifyContent: "center", marginTop: 20 },
+  loginContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 20,
+  },
   loginText: { color: "#666" },
   loginLink: { color: "#6C63FF", fontWeight: "600" },
 });
