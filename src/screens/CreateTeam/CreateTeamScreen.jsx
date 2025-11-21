@@ -1,56 +1,35 @@
 // src/screens/Team/CreateTeamScreen.js
-import React, { useState } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import { useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
   KeyboardAvoidingView,
   Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import { useDispatch } from "react-redux";
+import { createTeam } from "../../redux/features/teamSlice";
 
 export default function CreateTeamScreen({ navigation }) {
+  const dispatch = useDispatch();
   const [teamName, setTeamName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleCreateTeam = async () => {
-    // Validation
-    if (!teamName.trim()) {
-      Alert.alert("Error", "Please enter a team name");
-      return;
-    }
-
-    setIsLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      const newTeam = {
-        name: teamName,
-        createdAt: new Date().toISOString(),
-      };
-
-      console.log("Team created:", newTeam);
-      
-      Alert.alert(
-        "Success! 🎉",
-        `Team "${teamName}" has been created successfully!`,
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              // navigation.goBack(); // Navigate back to home
-              // Or reset form:
-              setTeamName("");
-            },
-          },
-        ]
-      );
-      
-      setIsLoading(false);
-    }, 1000);
+  // Create team
+  const handleCreateTeam = () => {
+    if (!teamName) return alert("Enter team name");
+    dispatch(createTeam({ name: teamName }))
+      .unwrap()
+      .then(() => {
+        alert("Team created ✅");
+        setIsLoading(false);
+        setTeamName("");
+        navigation.navigate("Tabs", { screen: "Home" });
+      })
+      .catch((err) => alert(err));
   };
 
   return (

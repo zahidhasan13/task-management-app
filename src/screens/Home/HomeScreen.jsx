@@ -1,91 +1,183 @@
 // src/screens/Home/HomeScreen.js
-import React from "react";
-import { View, Text, FlatList, StyleSheet, TouchableOpacity } from "react-native";
-import { LinearGradient } from 'expo-linear-gradient';
-
-// Demo data
-const user = {
-  name: "John Doe",
-};
-
-const teams = [
-  { id: 1, name: "Design Team", description: "Handles all UI/UX design tasks", color: ["#667eea", "#764ba2"], icon: "🎨", members: 8 },
-  { id: 2, name: "Development Team", description: "Frontend & backend developers", color: ["#f093fb", "#f5576c"], icon: "💻", members: 12 },
-  { id: 3, name: "Marketing Team", description: "Marketing & social media campaigns", color: ["#4facfe", "#00f2fe"], icon: "📱", members: 6 },
-  { id: 4, name: "QA Team", description: "Quality assurance & testing", color: ["#43e97b", "#38f9d7"], icon: "✅", members: 5 },
-];
+import { API_URL } from "@env";
+import { LinearGradient } from "expo-linear-gradient";
+import { useEffect } from "react";
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useDispatch, useSelector } from "react-redux";
+import { setCredentials } from "../../redux/features/authSlice";
+// import { fetchProjects } from "../../redux/features/projectSlice";
+import { useNavigation } from "@react-navigation/native";
+import { fetchTeams } from "../../redux/features/teamSlice";
 
 export default function HomeScreen() {
-  const renderTeamItem = ({ item }) => (
-    <TouchableOpacity activeOpacity={0.8}>
-      <LinearGradient
-        colors={item.color}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.teamCard}
+  const dispatch = useDispatch();
+  const navigation = useNavigation();
+  const { token, user } = useSelector((state) => state.auth);
+  const { teams } = useSelector((state) => state.team);
+  // const { projects } = useSelector((state) => state.project || { projects: [] });
+
+  const userName = user?.name || "User";
+
+  // Color palettes for team cards
+  const teamColors = [
+    { background: ["#FF9A8B", "#FF6B88", "#FF99AC"], text: "#fff" },
+    { background: ["#667eea", "#764ba2", "#6B8DD6"], text: "#fff" },
+    { background: ["#4FACFE", "#00F2FE", "#4FC3F7"], text: "#fff" },
+    { background: ["#43E97B", "#38F9D7", "#4CD964"], text: "#fff" },
+    { background: ["#FFED4E", "#FFA62E", "#FFD166"], text: "#333" },
+    { background: ["#A78BFA", "#7E5BEF", "#8B5CF6"], text: "#fff" },
+    { background: ["#FF6B6B", "#FF8E8E", "#FF5252"], text: "#fff" },
+    { background: ["#00D2FF", "#3A7BD5", "#2979FF"], text: "#fff" },
+  ];
+
+  // Get random color for team card
+  const getTeamColor = (index) => {
+    return teamColors[index % teamColors.length];
+  };
+
+  // Fetch User
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/me`, {
+          credentials: "include",
+        });
+        const data = await res.json();
+        if (res.ok && data.user) {
+          dispatch(setCredentials({ user: data.user, token: data.token }));
+        }
+      } catch (err) {
+        console.log("User fetch error:", err);
+      }
+    };
+
+    fetchUser();
+  }, [dispatch]);
+
+  // Fetch Teams + Projects
+  useEffect(() => {
+    if (token) {
+      dispatch(fetchTeams());
+      // dispatch(fetchProjects()); // <-- Load Project Count
+    }
+  }, [token]);
+
+  // Handle team press - navigate to TaskListScreen
+  const handleTeamPress = (team) => {
+    navigation.navigate("Tasks", { 
+      teamId: team._id,
+      teamName: team.name 
+    });
+  };
+
+  // TEAM CARD UI - COLORFUL VERSION
+  const renderTeamItem = ({ item, index }) => {
+    const colors = getTeamColor(index);
+    return (
+      <TouchableOpacity
+        onPress={() => handleTeamPress(item)}
+        activeOpacity={0.8}
       >
-        <View style={styles.cardContent}>
-          <View style={styles.iconContainer}>
-            <Text style={styles.icon}>{item.icon}</Text>
-          </View>
-          <View style={styles.teamInfo}>
-            <Text style={styles.teamName}>{item.name}</Text>
-            <Text style={styles.teamDesc}>{item.description}</Text>
-            <View style={styles.memberBadge}>
-              <Text style={styles.memberText}>{item.members} members</Text>
+        <LinearGradient
+          colors={colors.background}
+          style={styles.teamCard}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={styles.teamHeader}>
+            <Text style={[styles.teamName, { color: colors.text }]}>
+              {item?.name}
+            </Text>
+            <View style={[styles.teamIcon, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+              <Text style={[styles.teamIconText, { color: colors.text }]}>
+                {item?.name?.charAt(0).toUpperCase()}
+              </Text>
             </View>
           </View>
-        </View>
-        <View style={styles.cardShine} />
-      </LinearGradient>
-    </TouchableOpacity>
-  );
+
+          <View style={styles.teamDetails}>
+            <View style={styles.detailRow}>
+              <Text style={[styles.teamLabel, { color: colors.text }]}>👑 Captain:</Text>
+              <Text style={[styles.teamValue, { color: colors.text }]}>
+                {item?.captain?.name || "Unknown"}
+              </Text>
+            </View>
+            
+            <View style={styles.detailRow}>
+              <Text style={[styles.teamLabel, { color: colors.text }]}>👥 Members:</Text>
+              <Text style={[styles.teamValue, { color: colors.text }]}>
+                {item?.members?.length || 0}
+              </Text>
+            </View>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <LinearGradient
-      colors={["#f8f9fa", "#e9ecef"]}
-      style={styles.container}
-    >
+    <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.container}>
+      
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Hello, {user.name} 👋</Text>
-          <Text style={styles.subtitle}>Welcome back! Here are your teams</Text>
+          <Text style={styles.greeting}>Hello, {userName} 👋</Text>
+          <Text style={styles.subtitle}>Welcome back to your workspace!</Text>
         </View>
+
         <View style={styles.avatarContainer}>
-          <LinearGradient
-            colors={["#667eea", "#764ba2"]}
+          <LinearGradient 
+            colors={["#FF9A8B", "#FF6B88"]} 
             style={styles.avatar}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
-            <Text style={styles.avatarText}>JD</Text>
+            <Text style={styles.avatarText}>
+              {userName.charAt(0).toUpperCase()}
+            </Text>
           </LinearGradient>
         </View>
       </View>
 
-      {/* Stats Overview */}
+      {/* STATS */}
       <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>4</Text>
-          <Text style={styles.statLabel}>Teams</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>31</Text>
-          <Text style={styles.statLabel}>Members</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>12</Text>
-          <Text style={styles.statLabel}>Projects</Text>
-        </View>
+        <LinearGradient 
+          colors={["#4FACFE", "#00F2FE"]} 
+          style={styles.statCard}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Text style={styles.statNumber}>{teams?.length || 0}</Text>
+          <Text style={styles.statLabel}>Total Teams</Text>
+        </LinearGradient>
+
+        <LinearGradient 
+          colors={["#43E97B", "#38F9D7"]} 
+          style={styles.statCard}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Text style={styles.statNumber}>
+            {/* {projects?.length || 0} */}0
+          </Text>
+          <Text style={styles.statLabel}>Total Projects</Text>
+        </LinearGradient>
       </View>
 
-      {/* Team List */}
-      <Text style={styles.sectionTitle}>Your Teams</Text>
+      {/* Teams Section */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Your Teams</Text>
+        <Text style={styles.sectionSubtitle}>
+          {teams?.length || 0} active teams
+        </Text>
+      </View>
+
       <FlatList
-        data={teams}
-        keyExtractor={(item) => item.id.toString()}
+        data={teams || []}
+        keyExtractor={(item) => item?._id || Math.random().toString()}
         renderItem={renderTeamItem}
-        contentContainerStyle={{ paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.teamList}
       />
     </LinearGradient>
   );
@@ -97,141 +189,158 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 50,
   },
+
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 25,
   },
+
   greeting: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "800",
-    color: "#1a1a1a",
-    marginBottom: 4,
+    color: "#fff",
   },
+
   subtitle: {
-    fontSize: 15,
-    color: "#6c757d",
-    fontWeight: "500",
+    fontSize: 14,
+    color: "rgba(255,255,255,0.8)",
+    marginTop: 4,
   },
+
   avatarContainer: {
-    shadowColor: "#667eea",
+    elevation: 8,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 5,
   },
+
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 3,
-    borderColor: "#fff",
   },
+
   avatarText: {
-    color: "#fff",
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "700",
+    color: "#fff",
   },
+
+  // Stats
   statsContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 30,
     gap: 12,
+    marginBottom: 25,
   },
+
   statCard: {
     flex: 1,
-    backgroundColor: "#fff",
+    padding: 20,
     borderRadius: 16,
-    padding: 16,
     alignItems: "center",
+    elevation: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
   },
+
   statNumber: {
     fontSize: 24,
     fontWeight: "800",
-    color: "#1a1a1a",
+    color: "#fff",
     marginBottom: 4,
   },
+
   statLabel: {
-    fontSize: 12,
-    color: "#6c757d",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.9)",
     fontWeight: "600",
   },
+
+  // Teams Section
+  sectionHeader: {
+    marginBottom: 15,
+  },
+
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "700",
-    color: "#1a1a1a",
-    marginBottom: 16,
+    color: "#fff",
   },
+
+  sectionSubtitle: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.7)",
+    marginTop: 2,
+  },
+
+  teamList: {
+    paddingBottom: 20,
+  },
+
+  // Team Cards
   teamCard: {
-    borderRadius: 20,
-    marginBottom: 16,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  cardContent: {
-    flexDirection: "row",
-    padding: 20,
-  },
-  iconContainer: {
-    width: 60,
-    height: 60,
+    padding: 18,
     borderRadius: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.25)",
+    marginBottom: 12,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+
+  teamHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+
+  teamName: {
+    fontSize: 18,
+    fontWeight: "700",
+    flex: 1,
+  },
+
+  teamIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 16,
   },
-  icon: {
-    fontSize: 30,
-  },
-  teamInfo: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  teamName: {
-    fontSize: 19,
+
+  teamIconText: {
+    fontSize: 14,
     fontWeight: "700",
-    color: "#fff",
-    marginBottom: 4,
   },
-  teamDesc: {
+
+  teamDetails: {
+    gap: 6,
+  },
+
+  detailRow: {
+    flexDirection: "row",
+    // justifyContent: "space-between",
+    gap: 8,
+    alignItems: "center",
+  },
+
+  teamLabel: {
     fontSize: 13,
-    color: "rgba(255, 255, 255, 0.9)",
-    marginBottom: 8,
-    lineHeight: 18,
-  },
-  memberBadge: {
-    backgroundColor: "rgba(255, 255, 255, 0.25)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: "flex-start",
-  },
-  memberText: {
-    color: "#fff",
-    fontSize: 11,
     fontWeight: "600",
+    opacity: 0.9,
   },
-  cardShine: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    width: 100,
-    height: 100,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-    borderRadius: 50,
-    transform: [{ translateX: 30 }, { translateY: -30 }],
+
+  teamValue: {
+    fontSize: 13,
+    fontWeight: "500",
   },
 });

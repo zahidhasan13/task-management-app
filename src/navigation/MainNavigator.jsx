@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useSelector } from "react-redux";
+import TaskListScreen from "../screens/Tasks/TaskListScreen";
 import AuthNavigator from "./AuthNavigator";
 import TabNavigator from "./TabNavigator";
 
@@ -17,6 +18,7 @@ export default function MainNavigator() {
         // Not logged in → go to Auth (Login/Signup)
         <Stack.Screen name="Auth" component={AuthNavigator} />
       )}
+      <Stack.Screen name="Tasks" component={TaskListScreen} />
     </Stack.Navigator>
   );
 }
