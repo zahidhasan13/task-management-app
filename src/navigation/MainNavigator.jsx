@@ -3,6 +3,7 @@ import { useSelector } from "react-redux";
 import TaskListScreen from "../screens/Tasks/TaskListScreen";
 import AuthNavigator from "./AuthNavigator";
 import TabNavigator from "./TabNavigator";
+import TeamMemberListScreen from "../screens/TeamMember/TeamMember";
 
 const Stack = createNativeStackNavigator();
 
@@ -19,6 +20,7 @@ export default function MainNavigator() {
         <Stack.Screen name="Auth" component={AuthNavigator} />
       )}
       <Stack.Screen name="Tasks" component={TaskListScreen} />
+      <Stack.Screen name="TeamMember" component={TeamMemberListScreen} />
     </Stack.Navigator>
   );
 }

@@ -64,7 +64,8 @@ export default function HomeScreen() {
 
   // Handle team press - navigate to TaskListScreen
   const handleTeamPress = (team) => {
-    navigation.navigate("Tasks", { 
+    console.log(team._id,"team")
+    navigation.navigate("TeamMember", { 
       teamId: team._id,
       teamName: team.name 
     });
