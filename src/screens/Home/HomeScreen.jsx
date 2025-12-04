@@ -73,6 +73,7 @@ export default function HomeScreen() {
 
   // TEAM CARD UI - COLORFUL VERSION
   const renderTeamItem = ({ item, index }) => {
+    console.log(item,"item")
     const colors = getTeamColor(index);
     return (
       <TouchableOpacity

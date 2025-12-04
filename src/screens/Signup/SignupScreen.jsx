@@ -46,7 +46,7 @@ export default function SignupScreen({ navigation }) {
 
       dispatch(setCredentials({ user: data.user, token: data.token }));
       Alert.alert("Success", "Account Created ✅");
-      navigation.navigate("Tabs", { screen: "Home" });
+      // navigation.navigate("Tabs", { screen: "Home" });
     } catch (err) {
       console.log(err);
       Alert.alert("Error", "Something went wrong");

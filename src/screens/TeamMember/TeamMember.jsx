@@ -1,22 +1,32 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View
 } from "react-native";
 import { useDispatch, useSelector } from "react-redux";
-import { getSingleTeam } from "../../redux/features/teamSlice";
+import { addTeamMember, getSingleTeam } from "../../redux/features/teamSlice";
 
 export default function TeamMemberListScreen({ navigation, route }) {
   const teamID = route?.params?.teamId;
   const dispatch = useDispatch();
   const { singleTeam, loading, error } = useSelector((state) => state.team);
+  const [refreshing, setRefreshing] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [emailInput, setEmailInput] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
     if (teamID) {
@@ -24,34 +34,59 @@ export default function TeamMemberListScreen({ navigation, route }) {
     }
   }, [teamID, dispatch]);
 
-  // Demo fallback
-  const fallbackMembers = [
-    {
-      id: 1,
-      name: "John Doe",
-      role: "Team Captain",
-      isCaptain: true,
-    },
-    {
-      id: 2,
-      name: "Alice Johnson",
-      role: "UI/UX Designer",
-    },
-    {
-      id: 3,
-      name: "Bob Smith",
-      role: "Frontend Developer",
-    },
-    {
-      id: 4,
-      name: "Carol White",
-      role: "Product Researcher",
-    },
-  ];
+  // Get all unique team members (captain + members, no duplicates)
+  const getTeamMembers = () => {
+    if (!singleTeam) return [];
+    
+    const allMembers = [];
+    const uniqueEmails = new Set();
+    
+    // Add captain first if exists
+    if (singleTeam.captain && singleTeam.captain.email) {
+      const captain = {
+        ...singleTeam.captain,
+        isCaptain: true,
+        id: singleTeam.captain._id || `captain-${Date.now()}`,
+        role: "captain"
+      };
+      allMembers.push(captain);
+      uniqueEmails.add(singleTeam.captain.email.toLowerCase());
+    }
+    
+    // Add other members, skip if same as captain
+    if (singleTeam.members && Array.isArray(singleTeam.members)) {
+      singleTeam.members.forEach(member => {
+        const memberEmail = member.email?.toLowerCase();
+        
+        // Skip if member is the same as captain (same email)
+        if (memberEmail && uniqueEmails.has(memberEmail)) {
+          console.log(`Skipping duplicate member: ${memberEmail}`);
+          return;
+        }
+        
+        const regularMember = {
+          ...member,
+          isCaptain: false,
+          id: member._id || `member-${Date.now()}`,
+          role: member.role || "member"
+        };
+        allMembers.push(regularMember);
+        
+        if (memberEmail) {
+          uniqueEmails.add(memberEmail);
+        }
+      });
+    }
+    
+    return allMembers;
+  };
 
-  // If API returns team members, use them; otherwise use fallback
-  const members = singleTeam?.members || fallbackMembers;
-  const currentUser = singleTeam?.captain || { id: 1, name: "John Doe", isCaptain: true };
+  const members = getTeamMembers();
+  console.log("All team members (no duplicates):", members);
+  console.log("Single team data:", singleTeam);
+  
+  // Current user is the captain if they exist
+  const currentUser = singleTeam?.captain;
 
   // Function to get initials from name
   const getInitials = (name) => {
@@ -64,24 +99,45 @@ export default function TeamMemberListScreen({ navigation, route }) {
     return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase();
   };
 
-  // Function to generate background color based on name
-  const getAvatarColor = (name) => {
-    if (!name) return "#667eea";
+  // Function to generate gradient colors based on name
+  const getMemberGradient = (name, index) => {
+    if (!name) return ["#667eea", "#764ba2"];
     
-    const colors = [
-      "#667eea", "#764ba2", "#f093fb", "#f5576c", 
-      "#4facfe", "#00f2fe", "#43e97b", "#38f9d7",
-      "#ffecd2", "#fcb69f", "#a8edea", "#fed6e3",
-      "#ff9a9e", "#fecfef", "#f6d365", "#fda085"
+    // Predefined beautiful gradients
+    const gradients = [
+      ["#667eea", "#764ba2"], // Purple
+      ["#f093fb", "#f5576c"], // Pink to Red
+      ["#4facfe", "#00f2fe"], // Blue
+      ["#43e97b", "#38f9d7"], // Green
+      ["#ff9a9e", "#fecfef"], // Light Pink
+      ["#a8edea", "#fed6e3"], // Pastel
+      ["#f6d365", "#fda085"], // Orange
+      ["#d4fc79", "#96e6a1"], // Light Green
     ];
+    
+    // Use index or generate from name hash
+    if (index !== undefined) {
+      return gradients[index % gradients.length];
+    }
     
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
       hash = name.charCodeAt(i) + ((hash << 5) - hash);
     }
     
-    const index = Math.abs(hash) % colors.length;
-    return colors[index];
+    const indexFromHash = Math.abs(hash) % gradients.length;
+    return gradients[indexFromHash];
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    if (teamID) {
+      dispatch(getSingleTeam(teamID)).finally(() => {
+        setRefreshing(false);
+      });
+    } else {
+      setRefreshing(false);
+    }
   };
 
   const handleRemove = (id) => {
@@ -92,55 +148,134 @@ export default function TeamMemberListScreen({ navigation, route }) {
         style: "destructive",
         onPress: () => {
           // Later replace with API call
+          Alert.alert("Success", "Member removed successfully!");
         },
       },
     ]);
   };
 
   const handleAddMember = () => {
-    // Navigate to add member screen or show modal
-    Alert.alert("Add Member", "Feature coming soon!");
+    setModalVisible(true);
   };
 
-  const renderMember = ({ item }) => {
-    const initials = getInitials(item.name);
-    const backgroundColor = getAvatarColor(item.name);
+  const handleCloseModal = () => {
+    setModalVisible(false);
+    setEmailInput("");
+    setIsAdding(false);
+  };
+
+  const handleSubmitAddMember = () => {
+    if (!emailInput.trim()) {
+      Alert.alert("Error", "Please enter an email address");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailInput.trim())) {
+      Alert.alert("Error", "Please enter a valid email address");
+      return;
+    }
+
+    if (!singleTeam?._id) {
+      Alert.alert("Error", "Team information not available");
+      return;
+    }
+
+    setIsAdding(true);
     
-    return (
-      <View style={styles.card}>
-        <View style={styles.left}>
-          <View style={[styles.avatarContainer, { backgroundColor }]}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
+    dispatch(addTeamMember({ teamId: singleTeam._id, email: emailInput.trim() }))
+      .unwrap()
+      .then(() => {
+        Alert.alert("Success", "✅ Member added successfully!");
+        handleCloseModal();
+        // Refresh the team data
+        dispatch(getSingleTeam(teamID));
+      })
+      .catch((err) => {
+        Alert.alert("Error", err.message || "Failed to add member");
+        setIsAdding(false);
+      });
+  };
 
-          <View style={styles.memberInfo}>
-            <View style={styles.nameRow}>
-              <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
-              {item.isCaptain && (
-                <View style={styles.captainBadge}>
-                  <Ionicons name="shield-checkmark" size={12} color="#FFD700" />
-                  <Text style={styles.captainText}>Captain</Text>
-                </View>
-              )}
-            </View>
-            <Text style={styles.role} numberOfLines={1}>{item.role}</Text>
-          </View>
-        </View>
-
-        {currentUser?.isCaptain && !item?.isCaptain && (
-          <TouchableOpacity 
-            style={styles.removeBtn} 
-            onPress={() => handleRemove(item.id)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="person-remove-outline" size={22} color="#FF6B6B" />
-          </TouchableOpacity>
-        )}
-      </View>
+  const handleMemberPress = (member) => {
+    // Navigate to member detail screen
+    Alert.alert(
+      member?.name || "Unknown Member",
+      `Role: ${member?.isCaptain ? "Team Captain" : "Team Member"}\nEmail: ${member?.email || "No email"}${member?.isCaptain ? '\n\n👑 Team Captain' : ''}`
     );
   };
 
-  if (loading) {
+  const renderMember = ({ item, index }) => {
+    console.log("Rendering member:", item);
+    const initials = getInitials(item?.name);
+    const gradientColors = getMemberGradient(item?.name, index);
+    
+    return (
+      <TouchableOpacity 
+        style={styles.memberCard}
+        activeOpacity={0.8}
+        onPress={() => handleMemberPress(item)}
+      >
+        <LinearGradient
+          colors={gradientColors}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.memberGradient}
+        >
+          <View style={styles.memberContent}>
+            <View style={styles.memberLeft}>
+              <View style={styles.avatarContainer}>
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.85)']}
+                  style={styles.avatarGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Text style={[styles.avatarText, { color: gradientColors[0] }]}>
+                    {initials}
+                  </Text>
+                </LinearGradient>
+              </View>
+
+              <View style={styles.memberInfo}>
+                <View style={styles.memberHeader}>
+                  <Text style={styles.memberName} numberOfLines={1}>
+                    {item?.name || "Unknown Member"}
+                  </Text>
+                  {item?.isCaptain && (
+                    <View style={styles.captainBadge}>
+                      <Ionicons name="crown" size={10} color="#FFD700" />
+                      <Text style={styles.captainText}>Captain</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.memberRole} numberOfLines={1}>
+                  {item?.isCaptain ? "Team Captain" : "Team Member"}
+                </Text>
+                <Text style={styles.memberEmail} numberOfLines={1}>
+                  {item?.email || "No email provided"}
+                </Text>
+              </View>
+            </View>
+
+            {/* Only show remove button if current user is captain and member is not captain */}
+            {currentUser && !item?.isCaptain && (
+              <TouchableOpacity 
+                style={styles.removeButton}
+                onPress={() => handleRemove(item.id)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="person-remove-outline" size={20} color="#FF6B6B" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#667eea" />
@@ -151,66 +286,196 @@ export default function TeamMemberListScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      {/* ENHANCED HEADER */}
+      {/* HEADER WITH GRADIENT */}
       <LinearGradient
         colors={["#667eea", "#764ba2"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
-        <View style={styles.headerContent}>
-          <View style={styles.headerTextContainer}>
-            <Text style={styles.title}>Team Members</Text>
-            <Text style={styles.subtitle}>
-              {members.length} {members.length === 1 ? 'member' : 'members'} in your team
-            </Text>
-          </View>
-
+        <View style={styles.headerTop}>
           <TouchableOpacity 
-            style={styles.addButton} 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          
+          <Text style={styles.headerTitle}>Team Members</Text>
+          
+          <TouchableOpacity 
+            style={styles.addMemberButton} 
             onPress={handleAddMember}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="person-add-outline" size={24} color="#fff" />
+            <Ionicons name="person-add" size={22} color="#fff" />
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.headerStats}>
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+              <Ionicons name="people" size={20} color="#fff" />
+            </View>
+            <View style={styles.statInfo}>
+              <Text style={styles.statNumber}>{members.length}</Text>
+              <Text style={styles.statLabel}>Total Members</Text>
+            </View>
+          </View>
+          
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: 'rgba(255,215,0,0.2)' }]}>
+              <Ionicons name="shield-checkmark" size={18} color="#FFD700" />
+            </View>
+            <View style={styles.statInfo}>
+              <Text style={styles.statNumber}>
+                {members.filter(m => m.isCaptain).length}
+              </Text>
+              <Text style={styles.statLabel}>Captains</Text>
+            </View>
+          </View>
         </View>
       </LinearGradient>
 
-      {/* IMPROVED CONTENT */}
+      {/* COLORFUL MEMBER LIST */}
       <View style={styles.content}>
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>Team Members</Text>
-            <Text style={styles.sectionSubtitle}>Manage your team members</Text>
-          </View>
-          <View style={styles.stats}>
-            <Text style={styles.statText}>{members.length} total</Text>
-          </View>
-        </View>
-
-        {error && (
+        {error ? (
           <View style={styles.errorContainer}>
-            <Ionicons name="warning-outline" size={24} color="#dc2626" />
+            <Ionicons name="warning-outline" size={28} color="#dc2626" />
             <Text style={styles.errorText}>Failed to load team data</Text>
+            <TouchableOpacity 
+              style={styles.retryButton}
+              onPress={handleRefresh}
+            >
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
           </View>
+        ) : (
+          <FlatList
+            data={members}
+            keyExtractor={(item) => item?.id?.toString() || Math.random().toString()}
+            renderItem={renderMember}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            ItemSeparatorComponent={() => <View style={styles.separator} />}
+            ListHeaderComponent={
+              <View style={styles.listHeader}>
+                <View style={styles.listHeaderRow}>
+                  <View>
+                    <Text style={styles.listTitle}>Team Members</Text>
+                    <Text style={styles.listSubtitle}>
+                      {members.length} member{members.length !== 1 ? 's' : ''} in your team
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <LinearGradient
+                  colors={['#667eea', '#764ba2']}
+                  style={styles.emptyGradient}
+                >
+                  <Ionicons name="people-outline" size={64} color="rgba(255,255,255,0.9)" />
+                  <Text style={styles.emptyText}>No team members yet</Text>
+                  <Text style={styles.emptySubtext}>Start by adding your first team member</Text>
+                  <TouchableOpacity 
+                    style={styles.emptyButton}
+                    onPress={handleAddMember}
+                  >
+                    <Ionicons name="person-add" size={20} color="#667eea" />
+                    <Text style={styles.emptyButtonText}>Add Member</Text>
+                  </TouchableOpacity>
+                </LinearGradient>
+              </View>
+            }
+            ListFooterComponent={<View style={styles.footer} />}
+          />
         )}
-
-        <FlatList
-          data={members}
-          keyExtractor={(item) => item?.id?.toString() || item?._id?.toString() || Math.random().toString()}
-          renderItem={renderMember}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="people-outline" size={64} color="#cbd5e1" />
-              <Text style={styles.emptyText}>No team members found</Text>
-              <Text style={styles.emptySubtext}>Add members to get started</Text>
-            </View>
-          }
-        />
       </View>
+
+      {/* ADD MEMBER MODAL */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={handleCloseModal}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={styles.keyboardAvoid}
+            >
+              <TouchableWithoutFeedback>
+                <View style={styles.modalContainer}>
+                  <LinearGradient
+                    colors={["#667eea", "#764ba2"]}
+                    style={styles.modalHeader}
+                  >
+                    <View style={styles.modalHeaderContent}>
+                      <Text style={styles.modalTitle}>Add Team Member</Text>
+                      <TouchableOpacity 
+                        onPress={handleCloseModal}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Ionicons name="close" size={24} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.modalSubtitle}>
+                      Enter email address
+                    </Text>
+                  </LinearGradient>
+
+                  <View style={styles.modalBody}>
+                    <View style={styles.inputContainer}>
+                      <Ionicons name="mail-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Enter email address"
+                        placeholderTextColor="#94a3b8"
+                        value={emailInput}
+                        onChangeText={setEmailInput}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="email-address"
+                        returnKeyType="send"
+                        onSubmitEditing={handleSubmitAddMember}
+                        autoFocus={true}
+                      />
+                    </View>
+
+                    <View style={styles.modalButtons}>
+                      <TouchableOpacity 
+                        style={[styles.modalButton, styles.cancelButton]}
+                        onPress={handleCloseModal}
+                        disabled={isAdding}
+                      >
+                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={[styles.modalButton, styles.submitButton, isAdding && styles.submitButtonDisabled]}
+                        onPress={handleSubmitAddMember}
+                        disabled={isAdding}
+                      >
+                        {isAdding ? (
+                          <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                          <Text style={styles.submitButtonText}>Add Member</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 }
@@ -225,21 +490,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8fafc'
+    backgroundColor: '#f8fafc',
   },
 
   loadingText: {
-    marginTop: 12,
+    marginTop: 16,
     fontSize: 16,
-    color: '#64748b'
+    color: '#64748b',
+    fontWeight: '500',
   },
 
   header: {
     paddingTop: 60,
     paddingBottom: 30,
     paddingHorizontal: 24,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -247,224 +513,428 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
 
-  headerContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 25,
   },
 
-  headerTextContainer: {
-    flex: 1,
-    marginRight: 16,
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
-  title: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "#fff",
-    marginBottom: 6,
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#fff',
     letterSpacing: -0.5,
   },
 
-  subtitle: {
-    fontSize: 16,
-    color: "rgba(255,255,255,0.9)",
-    fontWeight: "500",
+  addMemberButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
-  addButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.3)",
+  headerStats: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+
+  statCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+  },
+
+  statIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  statInfo: {
+    flex: 1,
+  },
+
+  statNumber: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 2,
+  },
+
+  statLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '500',
+    letterSpacing: 0.5,
   },
 
   content: { 
     flex: 1, 
-    paddingHorizontal: 24, 
-    paddingTop: 24 
+    backgroundColor: '#f8fafc',
   },
 
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 24,
+  listHeader: {
+    paddingVertical: 24,
   },
 
-  sectionTitle: { 
-    fontSize: 24, 
-    fontWeight: "700", 
-    color: "#1e293b",
-    marginBottom: 4,
+  listHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
 
-  sectionSubtitle: {
+  listTitle: { 
+    fontSize: 22, 
+    fontWeight: '700', 
+    color: '#1e293b',
+    marginBottom: 6,
+  },
+
+  listSubtitle: {
     fontSize: 14,
-    color: "#64748b",
-    fontWeight: "500",
-  },
-
-  stats: {
-    backgroundColor: "rgba(100,116,139,0.1)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    minWidth: 70,
-    alignItems: 'center',
-  },
-
-  statText: { 
-    fontSize: 13, 
-    fontWeight: "700", 
-    color: "#475569" 
+    color: '#64748b',
+    fontWeight: '500',
   },
 
   listContent: { 
+    paddingHorizontal: 24,
     paddingBottom: 30,
-    flexGrow: 1,
   },
 
   separator: { 
-    height: 12 
+    height: 16 
   },
 
-  card: {
-    backgroundColor: "#fff",
+  memberCard: {
     borderRadius: 20,
-    padding: 20,
-    flexDirection: "row",
-    alignItems: "center",
+    overflow: 'hidden',
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: "rgba(226, 232, 240, 0.8)",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
   },
 
-  left: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    flex: 1 
+  memberGradient: {
+    borderRadius: 20,
+    padding: 2,
+  },
+
+  memberContent: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  memberLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 16,
   },
 
   avatarContainer: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+
+  avatarGradient: {
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
 
   avatarText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#fff",
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    fontSize: 20,
+    fontWeight: '800',
   },
 
   memberInfo: { 
-    marginLeft: 16, 
-    flex: 1 
+    flex: 1,
+    gap: 4,
   },
 
-  nameRow: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    marginBottom: 6,
-    flexWrap: 'wrap'
+  memberHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
   },
 
-  name: { 
-    fontSize: 17, 
-    fontWeight: "700", 
-    color: "#1e293b", 
-    marginRight: 8,
-    flexShrink: 1
+  memberName: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: '#1e293b',
   },
 
   captainBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,215,0,0.15)",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,215,0,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
     gap: 4,
   },
 
   captainText: { 
-    fontSize: 11, 
-    fontWeight: "700", 
-    color: "#B8860B" 
+    fontSize: 10, 
+    fontWeight: '700', 
+    color: '#B8860B',
+    letterSpacing: 0.3,
   },
 
-  role: { 
+  memberRole: { 
     fontSize: 14, 
-    color: "#64748b",
-    fontWeight: "500",
+    color: '#475569',
+    fontWeight: '600',
   },
 
-  removeBtn: {
+  memberEmail: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontWeight: '500',
+  },
+
+  removeButton: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: "rgba(255,107,107,0.1)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: 'rgba(255,107,107,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: "rgba(255,107,107,0.2)",
+    borderColor: 'rgba(255,107,107,0.2)',
   },
 
   errorContainer: {
-    backgroundColor: '#fef2f2',
-    padding: 16,
-    borderRadius: 12,
-    flexDirection: 'row',
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#dc2626'
+    paddingHorizontal: 40,
   },
 
   errorText: {
     color: '#dc2626',
-    marginLeft: 8,
+    marginTop: 12,
+    marginBottom: 20,
     fontWeight: '600',
-    fontSize: 14
+    fontSize: 16,
+    textAlign: 'center',
+  },
+
+  retryButton: {
+    backgroundColor: '#667eea',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+
+  retryText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 20,
+    marginVertical: 40,
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+
+  emptyGradient: {
+    width: '100%',
+    padding: 40,
+    alignItems: 'center',
+    borderRadius: 24,
   },
 
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#475569',
-    marginTop: 16,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+    marginTop: 20,
     marginBottom: 8,
+    textAlign: 'center',
   },
 
   emptySubtext: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+
+  emptyButtonText: {
+    color: '#667eea',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+
+  footer: {
+    height: 30,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+
+  keyboardAvoid: {
+    width: '100%',
+  },
+
+  modalContainer: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+
+  modalHeader: {
+    padding: 24,
+  },
+
+  modalHeaderContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+  },
+
+  modalSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    fontWeight: '500',
+  },
+
+  modalBody: {
+    padding: 24,
+  },
+
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginBottom: 24,
+  },
+
+  inputIcon: {
+    marginRight: 12,
+  },
+
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1e293b',
+    fontWeight: '500',
+  },
+
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+
+  modalButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  cancelButton: {
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+
+  submitButton: {
+    backgroundColor: '#667eea',
+  },
+
+  submitButtonDisabled: {
+    opacity: 0.7,
+  },
+
+  submitButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
