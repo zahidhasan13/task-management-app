@@ -60,7 +60,8 @@ export const updateTeam = createAsyncThunk(
       });
 
       const data = await res.json();
-      if (!res.ok) return rejectWithValue(data.message || "Failed to update team");
+      if (!res.ok)
+        return rejectWithValue(data.message || "Failed to update team");
       return data.team;
     } catch (err) {
       return rejectWithValue(err.message);
@@ -84,7 +85,8 @@ export const deleteTeam = createAsyncThunk(
       });
 
       const data = await res.json();
-      if (!res.ok) return rejectWithValue(data.message || "Failed to delete team");
+      if (!res.ok)
+        return rejectWithValue(data.message || "Failed to delete team");
       return teamId;
     } catch (err) {
       return rejectWithValue(err.message);
@@ -98,6 +100,10 @@ export const addTeamMember = createAsyncThunk(
   async ({ teamId, memberEmail }, { rejectWithValue, getState }) => {
     const { token } = getState().auth;
     try {
+      console.log("Adding member:", { teamId, memberEmail });
+      console.log("API_URL:", API_URL);
+      console.log("Token:", token ? "exists" : "missing");
+
       const res = await fetch(`${API_URL}/teamMember`, {
         method: "POST",
         headers: {
@@ -107,15 +113,21 @@ export const addTeamMember = createAsyncThunk(
         body: JSON.stringify({ memberEmail, teamId }),
       });
 
+      console.log("Add member response status:", res.status);
       const data = await res.json();
-      if (!res.ok) return rejectWithValue(data.message);
+      console.log("Add member response data:", data);
+
+      if (!res.ok)
+        return rejectWithValue(
+          data.message || data.error || "Failed to add member"
+        );
       return data;
     } catch (err) {
+      console.error("Add member error:", err);
       return rejectWithValue(err.message);
     }
   }
 );
-
 
 // ✅ Delete Member from Team
 export const deleteTeamMember = createAsyncThunk(
@@ -147,14 +159,35 @@ export const getSingleTeam = createAsyncThunk(
   async (teamId, { rejectWithValue, getState }) => {
     const { token } = getState().auth;
     try {
+      console.log("Fetching team:", teamId);
+      console.log("API_URL:", API_URL);
+      console.log("Token:", token ? "exists" : "missing");
+
       const res = await fetch(`${API_URL}/team/${teamId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      console.log("Response status:", res.status);
       const data = await res.json();
-      if (!res.ok) return rejectWithValue(data.message);
+      console.log("Response data:", data);
+
+      if (!res.ok) {
+        const errorMsg =
+          data.message || data.error || `HTTP Error ${res.status}`;
+        return rejectWithValue(errorMsg);
+      }
+
+      if (!data.team) {
+        console.error("No team in response:", data);
+        return rejectWithValue(
+          data.message || data.error || "Team data not found"
+        );
+      }
+
       return data.team;
     } catch (err) {
-      return rejectWithValue(err.message);
+      console.error("getSingleTeam error:", err);
+      return rejectWithValue(err.message || "Network error occurred");
     }
   }
 );
@@ -169,7 +202,14 @@ const teamSlice = createSlice({
     error: null,
     success: null,
   },
-  reducers: {},
+  reducers: {
+    clearTeamError: (state) => {
+      state.error = null;
+    },
+    clearTeamSuccess: (state) => {
+      state.success = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       // Fetch Teams
@@ -269,6 +309,7 @@ const teamSlice = createSlice({
       // Get Single Team
       .addCase(getSingleTeam.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
       .addCase(getSingleTeam.fulfilled, (state, action) => {
         state.loading = false;
@@ -281,4 +322,5 @@ const teamSlice = createSlice({
   },
 });
 
+export const { clearTeamError, clearTeamSuccess } = teamSlice.actions;
 export default teamSlice.reducer;
